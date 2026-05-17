@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import { initDatabase } from "./database/initDatabase";
 import { productRoutes } from "./routes/productRoutes";
+import { userRoutes } from "./routes/userRoutes";
 
 const app = express();
 
@@ -18,5 +19,6 @@ app.get("/health", (request, response) => {
 });
 
 app.use("/api/products", productRoutes);
+app.use("/api/users", userRoutes);
 
 export { app };
