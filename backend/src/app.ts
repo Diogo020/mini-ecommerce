@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import { initDatabase } from "./database/initDatabase";
+import { productRoutes } from "./routes/productRoutes";
 
 const app = express();
 
@@ -15,5 +16,7 @@ app.get("/health", (request, response) => {
     message: "API Mini E-commerce funcionando"
   });
 });
+
+app.use("/api/products", productRoutes);
 
 export { app };
