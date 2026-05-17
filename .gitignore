@@ -1,0 +1,22 @@
+# Node
+node_modules/
+npm-debug.log*
+
+# Build
+dist/
+build/
+
+# Banco local
+*.sqlite
+*.sqlite3
+database.sqlite
+
+# Ambiente
+.env
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# VS Code
+.vscode/
