@@ -15,7 +15,7 @@ interface UserDatabaseRow {
   name: string;
   email: string;
   password: string;
-  active: number;
+  active: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -26,191 +26,150 @@ function mapUserRow(row: UserDatabaseRow): User {
     name: row.name,
     email: row.email,
     password: row.password,
-    active: Boolean(row.active),
+    active: row.active,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
 }
 
 export class UserRepository {
-  create(user: User): Promise<User> {
-    return new Promise((resolve, reject) => {
-      const sql = `
-        INSERT INTO users (
-          name,
-          email,
-          password,
-          active
-        ) VALUES (?, ?, ?, ?)
-      `;
+  async create(user: User): Promise<User> {
+    const sql = `
+      INSERT INTO users (
+        name,
+        email,
+        password,
+        active
+      ) VALUES ($1, $2, $3, $4)
+      RETURNING
+        id,
+        name,
+        email,
+        password,
+        active,
+        created_at,
+        updated_at
+    `;
 
-      const params = [
-        user.name,
-        user.email,
-        user.password,
-        user.active ? 1 : 0
-      ];
+    const params = [
+      user.name,
+      user.email,
+      user.password,
+      user.active
+    ];
 
-      database.run(sql, params, function (error) {
-        if (error) {
-          reject(error);
-          return;
-        }
-
-        const createdUser: User = {
-          id: this.lastID,
-          ...user
-        };
-
-        resolve(createdUser);
-      });
-    });
+    const result = await database.query<UserDatabaseRow>(sql, params);
+    return mapUserRow(result.rows[0]);
   }
 
-  findAll(): Promise<User[]> {
-    return new Promise((resolve, reject) => {
-      const sql = `
-        SELECT
-          id,
-          name,
-          email,
-          password,
-          active,
-          created_at,
-          updated_at
-        FROM users
-        ORDER BY id DESC
-      `;
+  async findAll(): Promise<User[]> {
+    const sql = `
+      SELECT
+        id,
+        name,
+        email,
+        password,
+        active,
+        created_at,
+        updated_at
+      FROM users
+      ORDER BY id DESC
+    `;
 
-      database.all(sql, [], (error, rows: UserDatabaseRow[]) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-
-        const users = rows.map(mapUserRow);
-        resolve(users);
-      });
-    });
+    const result = await database.query<UserDatabaseRow>(sql);
+    return result.rows.map(mapUserRow);
   }
 
-  findById(id: number): Promise<User | null> {
-    return new Promise((resolve, reject) => {
-      const sql = `
-        SELECT
-          id,
-          name,
-          email,
-          password,
-          active,
-          created_at,
-          updated_at
-        FROM users
-        WHERE id = ?
-      `;
+  async findById(id: number): Promise<User | null> {
+    const sql = `
+      SELECT
+        id,
+        name,
+        email,
+        password,
+        active,
+        created_at,
+        updated_at
+      FROM users
+      WHERE id = $1
+    `;
 
-      database.get(sql, [id], (error, row: UserDatabaseRow | undefined) => {
-        if (error) {
-          reject(error);
-          return;
-        }
+    const result = await database.query<UserDatabaseRow>(sql, [id]);
 
-        if (!row) {
-          resolve(null);
-          return;
-        }
+    if (result.rows.length === 0) {
+      return null;
+    }
 
-        resolve(mapUserRow(row));
-      });
-    });
+    return mapUserRow(result.rows[0]);
   }
 
-  findByEmail(email: string): Promise<User | null> {
-    return new Promise((resolve, reject) => {
-      const sql = `
-        SELECT
-          id,
-          name,
-          email,
-          password,
-          active,
-          created_at,
-          updated_at
-        FROM users
-        WHERE email = ?
-      `;
+  async findByEmail(email: string): Promise<User | null> {
+    const sql = `
+      SELECT
+        id,
+        name,
+        email,
+        password,
+        active,
+        created_at,
+        updated_at
+      FROM users
+      WHERE email = $1
+    `;
 
-      database.get(sql, [email], (error, row: UserDatabaseRow | undefined) => {
-        if (error) {
-          reject(error);
-          return;
-        }
+    const result = await database.query<UserDatabaseRow>(sql, [email]);
 
-        if (!row) {
-          resolve(null);
-          return;
-        }
+    if (result.rows.length === 0) {
+      return null;
+    }
 
-        resolve(mapUserRow(row));
-      });
-    });
+    return mapUserRow(result.rows[0]);
   }
 
-  update(id: number, user: User): Promise<User | null> {
-    return new Promise((resolve, reject) => {
-      const sql = `
-        UPDATE users
-        SET
-          name = ?,
-          email = ?,
-          password = ?,
-          active = ?,
-          updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `;
+  async update(id: number, user: User): Promise<User | null> {
+    const sql = `
+      UPDATE users
+      SET
+        name = $1,
+        email = $2,
+        password = $3,
+        active = $4,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $5
+      RETURNING
+        id,
+        name,
+        email,
+        password,
+        active,
+        created_at,
+        updated_at
+    `;
 
-      const params = [
-        user.name,
-        user.email,
-        user.password,
-        user.active ? 1 : 0,
-        id
-      ];
+    const params = [
+      user.name,
+      user.email,
+      user.password,
+      user.active,
+      id
+    ];
 
-      database.run(sql, params, function (error) {
-        if (error) {
-          reject(error);
-          return;
-        }
+    const result = await database.query<UserDatabaseRow>(sql, params);
 
-        if (this.changes === 0) {
-          resolve(null);
-          return;
-        }
+    if (result.rows.length === 0) {
+      return null;
+    }
 
-        resolve({
-          id,
-          ...user
-        });
-      });
-    });
+    return mapUserRow(result.rows[0]);
   }
 
-  delete(id: number): Promise<boolean> {
-    return new Promise((resolve, reject) => {
-      const sql = `
-        DELETE FROM users
-        WHERE id = ?
-      `;
+  async delete(id: number): Promise<boolean> {
+    const sql = `
+      DELETE FROM users
+      WHERE id = $1
+    `;
 
-      database.run(sql, [id], function (error) {
-        if (error) {
-          reject(error);
-          return;
-        }
-
-        resolve(this.changes > 0);
-      });
-    });
+    const result = await database.query(sql, [id]);
+    return result.rowCount !== null && result.rowCount > 0;
   }
 }

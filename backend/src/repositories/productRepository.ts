@@ -16,10 +16,10 @@ interface ProductDatabaseRow {
   id: number;
   name: string;
   description: string;
-  price: number;
+  price: string;
   stock_quantity: number;
   category: string;
-  active: number;
+  active: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -29,175 +29,146 @@ function mapProductRow(row: ProductDatabaseRow): Product {
     id: row.id,
     name: row.name,
     description: row.description,
-    price: row.price,
+    price: Number(row.price),
     stockQuantity: row.stock_quantity,
     category: row.category,
-    active: Boolean(row.active),
+    active: row.active,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
 }
 
 export class ProductRepository {
-  create(product: Product): Promise<Product> {
-    return new Promise((resolve, reject) => {
-      const sql = `
-        INSERT INTO products (
-          name,
-          description,
-          price,
-          stock_quantity,
-          category,
-          active
-        ) VALUES (?, ?, ?, ?, ?, ?)
-      `;
+  async create(product: Product): Promise<Product> {
+    const sql = `
+      INSERT INTO products (
+        name,
+        description,
+        price,
+        stock_quantity,
+        category,
+        active
+      ) VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING
+        id,
+        name,
+        description,
+        price,
+        stock_quantity,
+        category,
+        active,
+        created_at,
+        updated_at
+    `;
 
-      const params = [
-        product.name,
-        product.description,
-        product.price,
-        product.stockQuantity,
-        product.category,
-        product.active ? 1 : 0
-      ];
+    const params = [
+      product.name,
+      product.description,
+      product.price,
+      product.stockQuantity,
+      product.category,
+      product.active
+    ];
 
-      database.run(sql, params, function (error) {
-        if (error) {
-          reject(error);
-          return;
-        }
-
-        const createdProduct: Product = {
-          id: this.lastID,
-          ...product
-        };
-
-        resolve(createdProduct);
-      });
-    });
+    const result = await database.query<ProductDatabaseRow>(sql, params);
+    return mapProductRow(result.rows[0]);
   }
 
-  findAll(): Promise<Product[]> {
-    return new Promise((resolve, reject) => {
-      const sql = `
-        SELECT
-          id,
-          name,
-          description,
-          price,
-          stock_quantity,
-          category,
-          active,
-          created_at,
-          updated_at
-        FROM products
-        ORDER BY id DESC
-      `;
+  async findAll(): Promise<Product[]> {
+    const sql = `
+      SELECT
+        id,
+        name,
+        description,
+        price,
+        stock_quantity,
+        category,
+        active,
+        created_at,
+        updated_at
+      FROM products
+      ORDER BY id DESC
+    `;
 
-      database.all(sql, [], (error, rows: ProductDatabaseRow[]) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-
-        const products = rows.map(mapProductRow);
-        resolve(products);
-      });
-    });
+    const result = await database.query<ProductDatabaseRow>(sql);
+    return result.rows.map(mapProductRow);
   }
 
-  findById(id: number): Promise<Product | null> {
-    return new Promise((resolve, reject) => {
-      const sql = `
-        SELECT
-          id,
-          name,
-          description,
-          price,
-          stock_quantity,
-          category,
-          active,
-          created_at,
-          updated_at
-        FROM products
-        WHERE id = ?
-      `;
+  async findById(id: number): Promise<Product | null> {
+    const sql = `
+      SELECT
+        id,
+        name,
+        description,
+        price,
+        stock_quantity,
+        category,
+        active,
+        created_at,
+        updated_at
+      FROM products
+      WHERE id = $1
+    `;
 
-      database.get(sql, [id], (error, row: ProductDatabaseRow | undefined) => {
-        if (error) {
-          reject(error);
-          return;
-        }
+    const result = await database.query<ProductDatabaseRow>(sql, [id]);
 
-        if (!row) {
-          resolve(null);
-          return;
-        }
+    if (result.rows.length === 0) {
+      return null;
+    }
 
-        resolve(mapProductRow(row));
-      });
-    });
+    return mapProductRow(result.rows[0]);
   }
 
-  update(id: number, product: Product): Promise<Product | null> {
-    return new Promise((resolve, reject) => {
-      const sql = `
-        UPDATE products
-        SET
-          name = ?,
-          description = ?,
-          price = ?,
-          stock_quantity = ?,
-          category = ?,
-          active = ?,
-          updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `;
+  async update(id: number, product: Product): Promise<Product | null> {
+    const sql = `
+      UPDATE products
+      SET
+        name = $1,
+        description = $2,
+        price = $3,
+        stock_quantity = $4,
+        category = $5,
+        active = $6,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $7
+      RETURNING
+        id,
+        name,
+        description,
+        price,
+        stock_quantity,
+        category,
+        active,
+        created_at,
+        updated_at
+    `;
 
-      const params = [
-        product.name,
-        product.description,
-        product.price,
-        product.stockQuantity,
-        product.category,
-        product.active ? 1 : 0,
-        id
-      ];
+    const params = [
+      product.name,
+      product.description,
+      product.price,
+      product.stockQuantity,
+      product.category,
+      product.active,
+      id
+    ];
 
-      database.run(sql, params, function (error) {
-        if (error) {
-          reject(error);
-          return;
-        }
+    const result = await database.query<ProductDatabaseRow>(sql, params);
 
-        if (this.changes === 0) {
-          resolve(null);
-          return;
-        }
+    if (result.rows.length === 0) {
+      return null;
+    }
 
-        resolve({
-          id,
-          ...product
-        });
-      });
-    });
+    return mapProductRow(result.rows[0]);
   }
 
-  delete(id: number): Promise<boolean> {
-    return new Promise((resolve, reject) => {
-      const sql = `
-        DELETE FROM products
-        WHERE id = ?
-      `;
+  async delete(id: number): Promise<boolean> {
+    const sql = `
+      DELETE FROM products
+      WHERE id = $1
+    `;
 
-      database.run(sql, [id], function (error) {
-        if (error) {
-          reject(error);
-          return;
-        }
-
-        resolve(this.changes > 0);
-      });
-    });
+    const result = await database.query(sql, [id]);
+    return result.rowCount !== null && result.rowCount > 0;
   }
 }
